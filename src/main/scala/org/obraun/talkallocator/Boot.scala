@@ -1,30 +1,25 @@
-package bootstrap.liftweb
+package org.obraun.talkallocator
 
 import net.liftweb._
 import util._
 import Helpers._
-
 import common._
 import http._
 import sitemap._
 import Loc._
 import mapper._
-
-import code.model._
+import model._
 
 
 /**
  * A class that's instantiated early and run.  It allows the application
  * to modify lift's environment
  */
-class Boot {
+class Boot extends Bootable {
   def boot {
     if (!DB.jndiJdbcConnAvailable_?) {
       val vendor = 
-	new StandardDBVendor(Props.get("db.driver") openOr "org.h2.Driver",
-			     Props.get("db.url") openOr 
-			     "jdbc:h2:lift_proto.db;AUTO_SERVER=TRUE",
-			     Props.get("db.user"), Props.get("db.password"))
+	    new StandardDBVendor("org.h2.Driver","jdbc:h2:talkallocator.db;AUTO_SERVER=TRUE",Empty,Empty)
 
       LiftRules.unloadHooks.append(vendor.closeAllConnections_! _)
 
@@ -34,21 +29,28 @@ class Boot {
     // Use Lift's Mapper ORM to populate the database
     // you don't need to use Mapper to use Lift... use
     // any ORM you want
-    Schemifier.schemify(true, Schemifier.infoF _, User)
+    Schemifier.schemify(true, Schemifier.infoF _, User, Talk)
+    
+    Talk.createExampleTalks()
+    User.createExampleUsers()
 
     // where to search snippet
-    LiftRules.addToPackages("code")
+    LiftRules.addToPackages("org.obraun.talkallocator")
+    
+    val ifLoggedIn = If(() => User.loggedIn_?, () => RedirectResponse("/index"))
+    
+    val ifAdmin = If(() => User.superUser_?, () => RedirectResponse("/index"))
 
     // Build SiteMap
     val entries = List(
       Menu.i("Home") / "index", // the simple way to declare a menu
-
-      // more complex because this menu allows anything in the
-      // /static path to be visible
-      Menu(Loc("Static", Link(List("static"), true, "/static/index"), 
-	       "Static Content"))) :::
-    // the User management menu items
-    User.sitemap
+      
+      // Definieren von Menüeinträgen mit dem Loc-Objekt
+      // Params: Name, Link, Link-Text, 'LocParam' (Objekt der Klasse 'If')
+      Menu(Loc("Add",List("add"),"Talk hinzufügen / löschen",ifAdmin)),
+      Menu(Loc("Choose",List("choose"),"Talk auswählen",ifLoggedIn)),
+      Menu(Loc("Users",List("users"),"Benutzerliste",ifAdmin))
+    ) ::: User.sitemap // standard SiteMap für die Benutzerverwaltung hinzufügen
 
     // set the sitemap.  Note if you don't want access control for
     // each page, just comment this line out.
