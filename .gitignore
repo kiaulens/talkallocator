@@ -53,3 +53,5 @@ lift_proto*
 runner
 
 /bin
+/talkallocator.db.lock.db
+/talkallocator.db.h2.db
